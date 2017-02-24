@@ -54,6 +54,15 @@ union {
 	char *s;
 } tokenval;
 
+#ifdef HGT
+#define printf(_s, ...)                           \
+{                                              \
+	fprintf(stderr, "[PsocMapper] [%s] " _s, __func__, ##__VA_ARGS__); \
+	fflush(stderr); \
+}
+#define exit(_val) return _val;
+#endif /* HGT */
+
 struct gomp_task;
 
 struct gomp_tdg {
@@ -772,10 +781,14 @@ main(int argc, char *argv[])
 	printf("psoc_mapper Tool version %s (c) The P-SOCRATES Consortium\n", VERSION_STRING);
 	
 	if(argc < 2) {
-		printf("psoc_mapper: No input files specified\n");
+		printf("psoc_mapper: No input files specified. argc is %d\n", argc);
 		usage();
 		exit(EXIT_FAILURE);
 	}
+	
+	printf("argc: %d\n", argc);
+    for (i=0; i<argc; i++)
+		printf("- argv[%d] is '%s'!\n", i, argv[i]);
 
 	--argc;
 	while (*++argv && argv[0][0] == '-') {
