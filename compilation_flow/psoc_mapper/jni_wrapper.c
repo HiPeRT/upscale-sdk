@@ -21,23 +21,17 @@ enum RESULT {
 int main(int argc, char *argv[]);
 
 JNIEXPORT jint JNICALL Java_com_upscale_PsocMapper_GenerateTaskTable
-  (JNIEnv * env, jclass clazz, jobjectArray jDotFileNames, jstring jRuntimeDir, jstring jTableFileName) {
+  (JNIEnv * env, jclass clazz, jobjectArray jDotFileNames, jstring jTableFileName) {
 	 
 	if((*env)->IsSameObject(env, jDotFileNames, NULL) ) {
 		_mylog("No input DOT files!\n"); 
 		return (jint) ERROR_ARG_MISSING_INPUT_FILES;
 	}
 	
-	// if((*env)->IsSameObject(env, jRuntimeDir, NULL) ) {
-		// _mylog("No runtime directory specified!\n"); 
-		// return (jint) ERROR_ARG_MISSING_RUNTIME_DIR;
-	// }
-	
 	if((*env)->IsSameObject(env, jTableFileName, NULL) ) {
 		_mylog("No table file name specified!\n"); 
 		return (jint) ERROR_ARG_MISSING_TABLE_NAME;
-	}
-	
+	}	
 	
 	/* Parse input file names */
 	

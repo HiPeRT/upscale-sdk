@@ -10,10 +10,10 @@ extern "C" {
 /*
  * Class:     com_upscale_PsocMapper
  * Method:    GenerateTaskTable
- * Signature: ([Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I
+ * Signature: ([Ljava/lang/String;Ljava/lang/String;)I
  */
 JNIEXPORT jint JNICALL Java_com_upscale_PsocMapper_GenerateTaskTable
-  (JNIEnv *, jclass, jobjectArray, jstring, jstring);
+  (JNIEnv *, jclass, jobjectArray, jstring);
 
 #ifdef __cplusplus
 }

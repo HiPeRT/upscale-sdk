@@ -46,7 +46,7 @@
 #define MAXDEP 200000
 
 /* This will be printed at the beginning of execution */
-#define VERSION_STRING "1.0"
+#define VERSION_STRING "1.1"
 
 // Libgomp TDG structure generation variables 
 union {
@@ -438,7 +438,7 @@ deplist(void)
 			p = &deps[ndeps-1];
 			p->dst = dst;
 			p->src = src;
-			printf("Added dep #%ld: src %ld dst %ld\n", ndeps-1, src, dst); 
+			// printf("Added dep #%ld: src %ld dst %ld\n", ndeps-1, src, dst); 
 			src = dst;
 		}
 		if(!dst) // no arrow: properties
@@ -479,14 +479,17 @@ lookup(int tdg_i, long task_i)
 	high = &gtdg[tdg_i][nnodes[tdg_i]-1];
 	 while (low <= high) {
 		mid = &low[(high - low) / 2];
-		if (task_i == mid->id)
+		if (task_i == mid->id) {
+			// printf("lookup(%d, %ld) returning %d\n", tdg_i, task_i, mid - gtdg[tdg_i]);
 			return mid - gtdg[tdg_i];
+		}
 		else if (task_i < mid->id)
 			high = mid - 1;
 		else
 			low = mid + 1;
 	}
 	error("looking for an incorrect task '%ld\n'", task_i);
+	printf("lookup(%d, %ld) returning 0\n", tdg_i, task_i);
 	return 0;
 }
 
@@ -786,9 +789,9 @@ main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 	
-	printf("argc: %d\n", argc);
-    for (i=0; i<argc; i++)
-		printf("- argv[%d] is '%s'!\n", i, argv[i]);
+	// printf("argc: %d\n", argc);
+    // for (i=0; i<argc; i++)
+		// printf("- argv[%d] is '%s'!\n", i, argv[i]);
 
 	--argc;
 	while (*++argv && argv[0][0] == '-') {
@@ -916,9 +919,7 @@ main(int argc, char *argv[])
 		char readAdditionalNodes = 1;
 		if(readAdditionalNodes) {
 			char additionalNodesFilename[GRAPHNAME_MAX_LEN + 10];
-// 			snprintf(additionalNodesFilename, strlen(graphName[tdg_id]) + 4, "%s-extra.dot", graphName[tdg_id]);
 			sprintf(additionalNodesFilename, "%s-extra.dot", graphName[tdg_id]);
-			printf("Will read additional nodes for graph '%s' from file is '%s'\n", graphName[tdg_id], additionalNodesFilename);
 			 
 			if(fgraph) {
 				fclose(fgraph);
@@ -929,6 +930,7 @@ main(int argc, char *argv[])
 			}
 			else {
 				read_extra_infos();
+				printf("Read additional nodes for graph '%s' from file is '%s'\n", graphName[tdg_id], additionalNodesFilename);
 			} // else file found			
 		} // if readAdditionalNodes
 		
@@ -1105,6 +1107,8 @@ main(int argc, char *argv[])
 		free(dag);
 	if(fgraph)
 		fclose(fgraph);
+	if(fout)
+		fclose(fout);
 	
 	return 0;
 }
