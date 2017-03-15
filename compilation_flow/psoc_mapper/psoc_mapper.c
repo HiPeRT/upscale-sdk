@@ -54,14 +54,15 @@ union {
 	char *s;
 } tokenval;
 
-#ifdef HGT
+// Need to redefine this, as printf doesn't work in JNI, and exit makes no sense...
+#ifdef HGT_JNI
 #define printf(_s, ...)                           \
 {                                              \
 	fprintf(stderr, "[PsocMapper] [%s] " _s, __func__, ##__VA_ARGS__); \
 	fflush(stderr); \
 }
 #define exit(_val) return _val;
-#endif /* HGT */
+#endif /* HGT_JNI */
 
 struct gomp_task;
 
@@ -93,6 +94,9 @@ unsigned lineno = 0;
 
 char token;
 int tdg_id = -1;
+#ifdef HGT
+int current_tdg_id_read = -1;
+#endif
 unsigned num_tdgs = 0;
 
 char *filename;
@@ -252,7 +256,6 @@ number(void)
 	return val;
 }
 
-
 void
 dumpnodes(int id)
 {
@@ -262,7 +265,6 @@ dumpnodes(int id)
 		       i, nodes[i], MIETs[i], MEETs[i], MAETs[i], nodeMap[i]);
 	}
 }
-
 
 void dumpdeps()
 {
@@ -297,6 +299,71 @@ addnode(long id)
 	MAETs[nnodes[tdg_id]-1] = -1;
 	nodeMap[nnodes[tdg_id]-1] = -1;
 }
+
+#ifdef HGT
+void
+parameter(unsigned long id)
+{
+	char *p;
+	int val;
+	char haveLabel = 0;
+	
+	if (token != SYMBOL)
+		error("symbol expected");
+	
+	while(1) {
+		if(!strcmp("]", toktext)) {
+			next();
+			break;
+		}
+		
+		// label
+		else if(!strcmp("label", toktext)) {
+			next();
+			expect('=');
+			if (token != STRING || (p = strchr(toktext, '=')) == NULL)
+				error("incorrect label in parameter");
+			*p++ = '\0';
+			val = atoi(p);
+			if(!strcmp("tdg_id",toktext)) {
+				if((tdg_id=val) >= num_tdgs)
+					error("tdg_id equal or bigger than the total number of tdgs (%d>=%d)\n",tdg_id, num_tdgs);
+				current_tdg_id_read = tdg_id;
+				
+				if(gtdg[tdg_id])
+					error("TDG with id %d already defined (name %s)\n",tdg_id,graphName[tdg_id]);
+			}
+			
+			if(!strcmp("maxI",toktext))
+				maxI[tdg_id] = val;
+			else if(!strcmp("maxT",toktext))
+				maxT[tdg_id] = val;
+			
+			
+			haveLabel = 1;
+		}
+		// OTHER TOKENS else {}
+		else {
+			while(token != ',' || token != ']') {
+				if(token == ']')
+					break;
+				next();
+			}
+		}
+		
+		if(token == ']') {
+			next();
+			break;
+		}
+		
+		next();
+	} // while
+	
+// 	if(!haveLabel)
+// 		error("label missed in parameter");
+}
+
+#else
 
 void
 parameter(unsigned long id)
@@ -333,6 +400,7 @@ parameter(unsigned long id)
 	expect(SYMBOL);  /* hidden */
 	expect(']');
 }
+#endif
 
 void
 expect2(char tok1, char tok2) {
@@ -344,6 +412,10 @@ expect2(char tok1, char tok2) {
 void
 nodeparameter(unsigned long id, unsigned long idx)
 {
+#ifdef HGT
+	// HGT times are in milliseconds, and they can be in the form, e.g., 1.90
+	float temp;
+#endif
 	// printf("nodeparameter(%lu, %lu)\n", id, idx);
 	while(1)
 	{
@@ -358,7 +430,12 @@ nodeparameter(unsigned long id, unsigned long idx)
 			next();
 			expect('=');
 // 			printf("1) token %c tokentext %s\n", token, toktext);
+#ifdef HGT
+			temp = atof(toktext);
+			MIETs[idx] = (int) (temp * 1000);// FIXME
+#else
 			MIETs[idx] = atoi(toktext);// FIXME
+#endif
 // 			printf("-- Read MIET '%lld' for node %ld\n", MIETs[idx], id);
 // 			printf("-- Read MIET '%s' for node %ld\n", toktext, id);
 			next();
@@ -368,7 +445,12 @@ nodeparameter(unsigned long id, unsigned long idx)
 			next();
 			expect('=');
 // 			printf("2) token %c tokentext %s\n", token, toktext);
+#ifdef HGT
+			temp = atof(toktext);
+			MEETs[idx] = (int) (temp * 1000);// FIXME
+#else
 			MEETs[idx] = atoi(toktext);
+#endif
 // 			printf("-- Read MEET '%ld' for node %ld\n", MEETs[idx], id);
 // 			printf("-- Read MEET '%s' for node %ld\n", toktext, id);
 			next();
@@ -377,7 +459,12 @@ nodeparameter(unsigned long id, unsigned long idx)
 			next();
 			expect('=');
 // 			printf("3) token %c tokentext %s\n", token, toktext);
+#ifdef HGT
+			temp = atof(toktext);
+			MAETs[idx] = (int) (temp * 1000);// FIXME
+#else
 			MAETs[idx] = atoi(toktext);
+#endif
 // 			printf("-- Read MAET '%ld' for node %ld\n", MAETs[idx], id);
 // 			printf("-- Read MAET '%s' for node %ld\n", toktext, id);
 			next();
@@ -561,9 +648,17 @@ read_graph(void)
 
 	accept(SYMBOL);
     strcpy(name, toktext);
+#ifdef HGT
+	current_tdg_id_read =  -1;
+#endif
 	expect('{');
 	deplist();
 	expect('}');
+	
+#ifdef HGT
+	if(current_tdg_id_read == -1)
+		error("\"tdg_id\" not set; it must be set with the 'label' parameter in the .dot file");
+#endif
 
 	graphName[tdg_id] =  xmalloc(sizeof(char)*GRAPHNAME_MAX_LEN);
 	strcpy(graphName[tdg_id],name);
@@ -791,7 +886,7 @@ main(int argc, char *argv[])
 	
 	// printf("argc: %d\n", argc);
     // for (i=0; i<argc; i++)
-		// printf("- argv[%d] is '%s'!\n", i, argv[i]);
+		// printf("- argv[%d] is '%s'\n", i, argv[i]);
 
 	--argc;
 	while (*++argv && argv[0][0] == '-') {
