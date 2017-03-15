@@ -2,6 +2,7 @@ CFLAGS += -O0 -g3
 # CFLAGS += -Wall
 # CFLAGS += -DDEBUG
 #CFLAGS+=-Wl,-kill-at
+CFLAGS += -DHGT
 LDFLAGS += -lm
 # CSRCS=dealer.c sched.c
 CSRCS=psoc_mapper.c sched.c dag.c
@@ -30,10 +31,10 @@ HGFLAGS=-I"C:\Program Files\Java\jdk1.8.0_73\include" -I"C:\Program Files\Java\j
 DEPLOYDIR="D:\UniMoRe\Workspace\hipert.hg\lib"
 # Form MinGW > mingw32-make.exe lib
 lib:
-	gcc ${ARCHFLAGS} ${HGFLAGS} -DHGT -Wall -c jni_wrapper.c -o jni_wrapper.o
-	gcc ${ARCHFLAGS} ${CFLAGS} -DHGT -c sched.c -o sched.o
-	gcc ${ARCHFLAGS} ${CFLAGS} -DHGT -c dag.c -o dag.o
-	gcc ${ARCHFLAGS} ${CFLAGS} -DHGT -c psoc_mapper.c -o psoc_mapper.o
+	gcc ${ARCHFLAGS} ${HGFLAGS} -DHGT_JNI -Wall -c jni_wrapper.c -o jni_wrapper.o
+	gcc ${ARCHFLAGS} ${CFLAGS} -DHGT_JNI -c sched.c -o sched.o
+	gcc ${ARCHFLAGS} ${CFLAGS} -DHGT_JNI -c dag.c -o dag.o
+	gcc ${ARCHFLAGS} ${CFLAGS} -DHGT_JNI -c psoc_mapper.c -o psoc_mapper.o
 	gcc ${ARCHFLAGS} -Wl,-kill-at -shared -o $(LIBNAME) psoc_mapper.o dag.o sched.o jni_wrapper.o
 	cp ${LIBNAME} ${DEPLOYDIR}
 

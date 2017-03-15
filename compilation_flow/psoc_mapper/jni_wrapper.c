@@ -63,7 +63,7 @@ JNIEXPORT jint JNICALL Java_com_upscale_PsocMapper_GenerateTaskTable
 	
 	_mylog("argc: %d\n", argc);
     for (i=0; i<argc; i++)
-		_mylog("- argv[%d] is '%s'!\n", i, argv[i]);
+		_mylog("- argv[%d] is '%s'\n", i, argv[i]);
 		
 	_mylog("Invoking psoc_mapper...\n");
 	int retval = main(argc, argv);
