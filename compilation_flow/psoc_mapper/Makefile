@@ -1,8 +1,8 @@
 CFLAGS += -O0 -g3
-# CFLAGS += -Wall
+CFLAGS += -Wall
 # CFLAGS += -DDEBUG
 #CFLAGS+=-Wl,-kill-at
-CFLAGS += -DHGT
+
 LDFLAGS += -lm
 # CSRCS=dealer.c sched.c
 CSRCS=psoc_mapper.c sched.c dag.c

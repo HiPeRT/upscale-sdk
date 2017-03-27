@@ -84,7 +84,8 @@ struct dep {
 
 struct gomp_tdg **gtdg;
 unsigned short **ins, **outs;
-long *maxI, *maxT, *nnodes;
+// Priorities and maps are ignored atm
+long *maxI, *maxT, *nnodes, *graphPeriods, *graphDeadlines, *graphPriorities, *graphMaps;
 char **graphName;
 
 struct dep *deps;
@@ -94,9 +95,7 @@ unsigned lineno = 0;
 
 char token;
 int tdg_id = -1;
-#ifdef HGT
 int current_tdg_id_read = -1;
-#endif
 unsigned num_tdgs = 0;
 
 char *filename;
@@ -115,6 +114,12 @@ scheduling_t scheduling = NONE;
 thread_t **mappings;
 int isSchedulable = 0;
 thread_t *nodeMap;
+
+/** Some configurations */
+// Period, deadline for DAGs are specified in "param nodes" of the dot file
+const char UseHgtDotModel = 1;
+// In P-SOC they are microseconds
+const char NodeCompTimesInMilliseconds = 1;
 
 void *xmalloc(size_t len);
 void *xrealloc(void *buf, size_t len);
@@ -215,12 +220,12 @@ next(void)
 			}
 		}
 		error("symbol too long");
-        } else if (c == '/') {
+	} else if (c == '/') {
 		if (getc(fgraph) == '/')
 			return token = COMMENT;
 		error("syntax error");
-        }
-        else {
+	}
+	else {
 		return token = c;
 	}
 	error("Unknow symbol");
@@ -300,73 +305,122 @@ addnode(long id)
 	nodeMap[nnodes[tdg_id]-1] = -1;
 }
 
-#ifdef HGT
 void
 parameter(unsigned long id)
 {
 	char *p;
 	int val;
-	char haveLabel = 0;
 	
 	if (token != SYMBOL)
 		error("symbol expected");
 	
 	while(1) {
-		if(!strcmp("]", toktext)) {
-			next();
-			break;
-		}
+		//printf("token is '%c' toktext is '%s'\n", token, toktext);
 		
-		// label
-		else if(!strcmp("label", toktext)) {
-			next();
-			expect('=');
-			if (token != STRING || (p = strchr(toktext, '=')) == NULL)
-				error("incorrect label in parameter");
-			*p++ = '\0';
-			val = atoi(p);
-			if(!strcmp("tdg_id",toktext)) {
-				if((tdg_id=val) >= num_tdgs)
-					error("tdg_id equal or bigger than the total number of tdgs (%d>=%d)\n",tdg_id, num_tdgs);
-				current_tdg_id_read = tdg_id;
+		switch(token)
+		{
+			case COMMENT:
+			case STRING:
+			case ARROW:
+			case NUMBER:
+				printf("Token must be a symbol (e.g., '%c')\n", token);
+				break;
 				
-				if(gtdg[tdg_id])
-					error("TDG with id %d already defined (name %s)\n",tdg_id,graphName[tdg_id]);
+			case SYMBOL:
+			default:
+				break;
+		}
+		
+		if(token == SYMBOL) {
+			// label
+			if(!strcmp("label", toktext)) {
+				next();
+				expect('=');
+				if (token != STRING || (p = strchr(toktext, '=')) == NULL)
+					error("incorrect label in parameter");
+				*p++ = '\0';
+				val = atoi(p);
+				
+				if(!strcmp("tdg_id",toktext)) {
+					if((tdg_id=val) >= num_tdgs)
+						error("tdg_id equal or bigger than the total number of tdgs (%d>=%d)\n",tdg_id, num_tdgs);
+					current_tdg_id_read = tdg_id;
+					
+					if(gtdg[tdg_id])
+						error("TDG with id %d already defined (name %s)\n",tdg_id,graphName[tdg_id]);
+				} // tdg_id
+				
+				else if(!strcmp("maxI",toktext)) {
+					maxI[tdg_id] = val;
+				}
+				
+				else if(!strcmp("maxT",toktext)) {
+					maxT[tdg_id] = val;
+				}
+				
+				else {
+					printf("Unknown DAG label value '%s'. Ignoring it..\n", toktext);
+				}
+			} // label
+			long currGraphPeriod, currGraphDeadline, currGraphPriority, currGraphMaps;
+			currGraphPeriod = currGraphDeadline, currGraphPriority, currGraphMaps;
+			DA QUI
+			else if(UseHgtDotModel && !strcmp("period", toktext)) {
+				next();
+				expect('=');
+				long currGraphPeriod = number();
+				graphPeriods[tdg_id+1] = number();
+			} // period
+			
+			else if(UseHgtDotModel && !strcmp("deadline", toktext)) {
+				next();
+				expect('=');
+				graphDeadlines[tdg_id+1] = number();
+			} // deadline
+			
+			else if(UseHgtDotModel && !strcmp("priority", toktext)) {
+				next();
+				expect('=');
+				graphPriorities[tdg_id] = number();
+			} // priority
+			
+			else if(UseHgtDotModel && !strcmp("map", toktext)) {
+				next();
+				expect('=');
+				graphMaps[tdg_id] = number();
+			} // map
+			
+			/* Known but ignored attributes */
+			else if(!strcmp("style", toktext)) {
+			} // style
+			
+			else {
+				// unknown
+				printf("Unknown DAG attribute '%s'. Ignoring it..\n", toktext);
 			}
 			
-			if(!strcmp("maxI",toktext))
-				maxI[tdg_id] = val;
-			else if(!strcmp("maxT",toktext))
-				maxT[tdg_id] = val;
-			
-			
-			haveLabel = 1;
-		}
-		// OTHER TOKENS else {}
+		} // token is a symbol
+		
+		// Other tokens
 		else {
-			while(token != ',' || token != ']') {
-				if(token == ']')
-					break;
-				next();
+			// consume until comma or end of parameter
+			while(token != ',' && token != ']') {
+					next();
 			}
 		}
 		
-		if(token == ']') {
-			next();
+		if(token == ']' || !strcmp("]", toktext))	
 			break;
-		}
 		
 		next();
+		
 	} // while
 	
-// 	if(!haveLabel)
-// 		error("label missed in parameter");
-}
-
-#else
+	next();
+} // parameter
 
 void
-parameter(unsigned long id)
+parameter_orig(unsigned long id)
 {
 	char *p;
 	int val;
@@ -399,8 +453,7 @@ parameter(unsigned long id)
 	expect('=');
 	expect(SYMBOL);  /* hidden */
 	expect(']');
-}
-#endif
+} // parameter_orig
 
 void
 expect2(char tok1, char tok2) {
@@ -412,10 +465,9 @@ expect2(char tok1, char tok2) {
 void
 nodeparameter(unsigned long id, unsigned long idx)
 {
-#ifdef HGT
 	// HGT times are in milliseconds, and they can be in the form, e.g., 1.90
 	float temp;
-#endif
+
 	// printf("nodeparameter(%lu, %lu)\n", id, idx);
 	while(1)
 	{
@@ -424,50 +476,45 @@ nodeparameter(unsigned long id, unsigned long idx)
 			
 		if(token == ']') // empty param
 			break;
-// 		printf("0) token %c tokentext %s\n", token, toktext);
 		
 		if (!strcmp("MIET", toktext) || !strcmp("miet", toktext)) {
 			next();
 			expect('=');
-// 			printf("1) token %c tokentext %s\n", token, toktext);
-#ifdef HGT
+		if(NodeCompTimesInMilliseconds) {
 			temp = atof(toktext);
-			MIETs[idx] = (int) (temp * 1000);// FIXME
-#else
+			MIETs[idx] = (int) (temp * 1000);
+		}
+		else
 			MIETs[idx] = atoi(toktext);// FIXME
-#endif
 // 			printf("-- Read MIET '%lld' for node %ld\n", MIETs[idx], id);
-// 			printf("-- Read MIET '%s' for node %ld\n", toktext, id);
 			next();
 			
 		}
 		else if(!strcmp("MEET", toktext) || !strcmp("meet", toktext)) {
 			next();
 			expect('=');
-// 			printf("2) token %c tokentext %s\n", token, toktext);
-#ifdef HGT
+
+		if(NodeCompTimesInMilliseconds) {
 			temp = atof(toktext);
-			MEETs[idx] = (int) (temp * 1000);// FIXME
-#else
+			MEETs[idx] = (int) (temp * 1000);
+		}
+		else
 			MEETs[idx] = atoi(toktext);
-#endif
 // 			printf("-- Read MEET '%ld' for node %ld\n", MEETs[idx], id);
-// 			printf("-- Read MEET '%s' for node %ld\n", toktext, id);
 			next();
 		}
 		else if(!strcmp("MAET", toktext) || !strcmp("maet", toktext)) {
 			next();
 			expect('=');
-// 			printf("3) token %c tokentext %s\n", token, toktext);
-#ifdef HGT
+		if(NodeCompTimesInMilliseconds) {
 			temp = atof(toktext);
-			MAETs[idx] = (int) (temp * 1000);// FIXME
-#else
+			MAETs[idx] = (int) (temp * 1000);
+		}
+		else
 			MAETs[idx] = atoi(toktext);
-#endif
 // 			printf("-- Read MAET '%ld' for node %ld\n", MAETs[idx], id);
-// 			printf("-- Read MAET '%s' for node %ld\n", toktext, id);
-			next();
+
+		next();
 		}
 		else if(!strcmp("MAP", toktext) || !strcmp("map", toktext))
 		{
@@ -647,21 +694,21 @@ read_graph(void)
 	next();
 
 	accept(SYMBOL);
-    strcpy(name, toktext);
-#ifdef HGT
+	strcpy(name, toktext);
+
 	current_tdg_id_read =  -1;
-#endif
+
 	expect('{');
 	deplist();
 	expect('}');
 	
-#ifdef HGT
-	if(current_tdg_id_read == -1)
-		error("\"tdg_id\" not set; it must be set with the 'label' parameter in the .dot file");
-#endif
-
+	printf("Read name '%s' for tdg %d\n", name, tdg_id);
 	graphName[tdg_id] =  xmalloc(sizeof(char)*GRAPHNAME_MAX_LEN);
 	strcpy(graphName[tdg_id],name);
+	
+	if(current_tdg_id_read == -1)
+		error("\"tdg_id\" not set; it must be set with the 'label' parameter in the .dot file");
+
 }
 
 void
@@ -794,6 +841,10 @@ init_global_tdg_structs()
 	maxT = xmalloc(sizeof(long) * num_tdgs);
 	maxI = xmalloc(sizeof(long) * num_tdgs);
 	graphName = xmalloc(sizeof(char *) * num_tdgs);
+	graphPeriods = xmalloc(sizeof(long *) * num_tdgs);
+	graphDeadlines = xmalloc(sizeof(long *) * num_tdgs);
+	graphPriorities = xmalloc(sizeof(long *) * num_tdgs);
+	graphMaps = xmalloc(sizeof(long *) * num_tdgs);
 
 	for(i=0; i<num_tdgs; i++) {
 		gtdg[i] = NULL;
@@ -803,6 +854,10 @@ init_global_tdg_structs()
 		maxT[i] = 0;
 		maxI[i] = 0;
 		graphName[i] = NULL;
+		graphPeriods[i] = -1;
+		graphDeadlines[i] = -1;
+		graphPriorities[i] = -1;
+		graphMaps[i] = -1;
 	}
 }
 
@@ -836,6 +891,10 @@ free_global_tdg_structs()
 	if(maxT) free(maxT);
 	if(maxI) free(maxI);
 	if(graphName) free(graphName);
+	if(graphPeriods) free(graphPeriods);
+	if(graphDeadlines) free(graphDeadlines);
+	if(graphPriorities) free(graphPriorities);
+	if(graphMaps) free(graphMaps);
 	if(deps) free(deps);
 }
 
@@ -1056,10 +1115,24 @@ main(int argc, char *argv[])
 				return 1;
 			}
 			
-			err = dagAssignParams(dag[tdg_id], 0);
-			if(err) {
-				printf("Error %d assigning DAG params to (%s - tdg_id %d)! Exiting...\n", err, graphName[tdg_id], tdg_id);
-				return 1;
+			if(UseHgtDotModel) {
+				err = dagAssignPeriod(dag[tdg_id], graphPeriods[tdg_id]);
+				if(err) {
+					printf("Error %d assigning DAG period to (%s - tdg_id %d)! Exiting...\n", err, graphName[tdg_id], tdg_id);
+					return 1;
+				}
+				err = dagAssignDeadline(dag[tdg_id], graphDeadlines[tdg_id]);
+				if(err) {
+					printf("Error %d assigning DAG deadline to (%s - tdg_id %d)! Exiting...\n", err, graphName[tdg_id], tdg_id);
+					return 1;
+				}
+			}
+			else {
+				err = dagAssignParams(dag[tdg_id], 0);
+				if(err) {
+					printf("Error %d assigning DAG params to (%s - tdg_id %d)! Exiting...\n", err, graphName[tdg_id], tdg_id);
+					return 1;
+				}
 			}
 		}
 		resetGlobals();

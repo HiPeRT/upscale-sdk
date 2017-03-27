@@ -455,6 +455,18 @@ void dagDeleteExistingMaps(struct dag_t **dags, int dagsLength) {
 	} // for
 } // dagDeleteExistingMaps
 
+int dagAssignPeriod(struct dag_t *dag, long T) {
+	printf("Assigning period %ld to %d.\n", T, dag->tdg_id);
+	dag->T = T;
+	return 0;
+}
+
+int dagAssignDeadline(struct dag_t *dag, long D) {
+	printf("Assigning deadline %ld to %d.\n", D, dag->tdg_id);
+	dag->D = D;
+	return 0;
+}
+
 int dagAssignParams(struct dag_t *dag, char ignoreDeadlinesFromFile) {
 	FILE *fp;
 	char buff[32];
@@ -478,9 +490,8 @@ int dagAssignParams(struct dag_t *dag, char ignoreDeadlinesFromFile) {
 		int tdg_id = atoi(buff);
 		if(dag->tdg_id == tdg_id) {
 			// here I am!
-			//printf("Assigning D %ld and T %ld to %d. Buff is %s\n", D, T, dag->tdg_id, buff);
-			dag->D = ignoreDeadlinesFromFile ? T : D;
-			dag->T = T;
+			dagAssignDeadline(dag, ignoreDeadlinesFromFile ? T : D);
+			dagAssignPeriod(dag, T);
 			break;
 		}
 		

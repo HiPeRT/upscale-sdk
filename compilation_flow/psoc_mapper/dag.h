@@ -106,6 +106,9 @@ void dagDispose(struct dag_t *dag);
 
 /* Read from file: D, T, etc... */
 int dagAssignParams(struct dag_t *dag, char ignoreDeadlinesFromFile);
+// Exposed to non-PSOC dag structures (e.g., HG)
+int dagAssignPeriod(struct dag_t *dag, long T);
+int dagAssignDeadline(struct dag_t *dag, long D);
 
 void dagDeleteExistingMaps(struct dag_t **dags, int dagsLength);
 long dagFindNodeIdx(struct node_t where[], long whereSize, struct node_t * who);
