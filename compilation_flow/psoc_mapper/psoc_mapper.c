@@ -362,9 +362,9 @@ parameter(unsigned long id)
 					printf("Unknown DAG label value '%s'. Ignoring it..\n", toktext);
 				}
 			} // label
-			long currGraphPeriod, currGraphDeadline, currGraphPriority, currGraphMaps;
-			currGraphPeriod = currGraphDeadline, currGraphPriority, currGraphMaps;
-			DA QUI
+// 			long currGraphPeriod, currGraphDeadline, currGraphPriority, currGraphMaps;
+// 			currGraphPeriod = currGraphDeadline = currGraphPriority = currGraphMaps = -1L;
+			//DA QUI
 			else if(UseHgtDotModel && !strcmp("period", toktext)) {
 				next();
 				expect('=');
@@ -1139,6 +1139,9 @@ main(int argc, char *argv[])
 			
 		argv++;
 	} // for countFiles<num_tdgs
+	
+	for(i=0; i<num_tdgs; i++)
+	  printDag(dag[i]);
 	
 	if(scheduling == NONE)
 	{

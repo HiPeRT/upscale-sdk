@@ -475,6 +475,7 @@ int dagAssignParams(struct dag_t *dag, char ignoreDeadlinesFromFile) {
 	char buff[32];
 	long D, T;
 	char * fName = "dagParams.txt";
+	printf("[dagAssignParams] Reading params from file %s.\n", fName);
 	fp = fopen(fName, "r");
 	if(fp == NULL) {
 		printf("Impossible to load params for DAG. File '%s' not found!\n", fName);
