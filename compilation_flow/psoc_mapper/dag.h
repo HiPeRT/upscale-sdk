@@ -50,8 +50,8 @@ typedef int thread_t;
 
 /* v = struct('pred', {}, 'succ', {}, 'cond', {}, 'depth', {}, 'width', {}, 'C', {}, 'accWorkload', {}, 'condPred', {}, 'branchList', {}); */
 struct node_t {
-	long idMercurium;
-	long dealerIdx; // to quickly build the dep table when we are done
+	long idMercurium; // TODO rename with something more generic?
+	long dealerIdx; // Revindex to quickly build the dep table when we are done
 	
 	struct node_t **preds;
 	struct node_t **succs;

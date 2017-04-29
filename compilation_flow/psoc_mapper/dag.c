@@ -157,7 +157,7 @@ int dagCreateEmpty(long nnodes, struct dag_t ** dag) {
 	struct node_t *v = (struct node_t*) malloc(sizeof(struct node_t) * nnodes);
 	if(!v)
 		return 1;
-	for(i =0; i<nnodes; i++) {
+	for(i=0; i<nnodes; i++) {
 		v[i].idMercurium = -1;
 		v[i].preds = NULL;
 		v[i].succs = NULL;

@@ -368,7 +368,6 @@ parameter(unsigned long id)
 			else if(UseHgtDotModel && !strcmp("period", toktext)) {
 				next();
 				expect('=');
-				long currGraphPeriod = number();
 				graphPeriods[tdg_id+1] = number();
 			} // period
 			
@@ -381,13 +380,13 @@ parameter(unsigned long id)
 			else if(UseHgtDotModel && !strcmp("priority", toktext)) {
 				next();
 				expect('=');
-				graphPriorities[tdg_id] = number();
+				graphPriorities[tdg_id+1] = number();
 			} // priority
 			
 			else if(UseHgtDotModel && !strcmp("map", toktext)) {
 				next();
 				expect('=');
-				graphMaps[tdg_id] = number();
+				graphMaps[tdg_id+1] = number();
 			} // map
 			
 			/* Known but ignored attributes */
@@ -702,7 +701,7 @@ read_graph(void)
 	deplist();
 	expect('}');
 	
-	printf("Read name '%s' for tdg %d\n", name, tdg_id);
+// 	printf("Read name '%s' for tdg %d\n", name, tdg_id);
 	graphName[tdg_id] =  xmalloc(sizeof(char)*GRAPHNAME_MAX_LEN);
 	strcpy(graphName[tdg_id],name);
 	
@@ -1079,13 +1078,13 @@ main(int argc, char *argv[])
 				fclose(fgraph);
 				fgraph = NULL;
 			}
-			if ((fgraph = fopen(additionalNodesFilename, "r")) == NULL) {
-				printf("Cannot find file %s. Won't read any additional node for graph '%s'\n", additionalNodesFilename, graphName[tdg_id]);
-			}
-			else {
+			if ((fgraph = fopen(additionalNodesFilename, "r")) != NULL) {
 				read_extra_infos();
 				printf("Read additional nodes for graph '%s' from file is '%s'\n", graphName[tdg_id], additionalNodesFilename);
-			} // else file found			
+			}
+// 			else {
+// 				printf("Cannot find file %s. Won't read any additional node for graph '%s'\n", additionalNodesFilename, graphName[tdg_id]);
+// 			} // else file found			
 		} // if readAdditionalNodes
 		
 		create_tdg_struct();
@@ -1108,7 +1107,20 @@ main(int argc, char *argv[])
 					break;
 			} // switch
 			
-			err = dagCreate(graphName[tdg_id], tdg_id, &nodes[0], &wcet[0], &nodeMap[0], nnodes[tdg_id], &deps[0], ndeps, 1 /* Fix single source-single sink */, &dag[tdg_id]);
+			// In case, inherit node-to-core mapping (if not already specified) by DAG-to-core mapping
+			if(graphMaps[tdg_id] >= 0L) {
+				for(int j=0; j<nnodes[tdg_id]; j++) {
+					if(nodeMap[j] < 0) {
+						nodeMap[j] = graphMaps[tdg_id];
+						printf("Node %ld will inherit map to thread %d from DAG\n", nodeMap[j]);
+					}
+					else
+						printf("Node %ld already has map to thread %d\n", nodeMap[j]);
+				}
+			} // nodes mapping
+			
+			err = dagCreate(graphName[tdg_id], tdg_id, &nodes[0], &wcet[0],
+					&nodeMap[0], nnodes[tdg_id], &deps[0], ndeps, 1 /* Fix single source-single sink */, &dag[tdg_id]);
 			
 			if(err) {
 				printf("Error %d creating DAG! Exiting...\n", err);
@@ -1116,17 +1128,26 @@ main(int argc, char *argv[])
 			}
 			
 			if(UseHgtDotModel) {
-				err = dagAssignPeriod(dag[tdg_id], graphPeriods[tdg_id]);
-				if(err) {
-					printf("Error %d assigning DAG period to (%s - tdg_id %d)! Exiting...\n", err, graphName[tdg_id], tdg_id);
-					return 1;
+			  
+				// Assign periods and deadlines, if any
+				if(graphPeriods[tdg_id] >= 0) {				  
+				  err = dagAssignPeriod(dag[tdg_id], graphPeriods[tdg_id]);
+				  if(err) {
+					  printf("Error %d assigning DAG period to (%s - tdg_id %d)! Exiting...\n", err, graphName[tdg_id], tdg_id);
+					  return 1;
+				  }
 				}
-				err = dagAssignDeadline(dag[tdg_id], graphDeadlines[tdg_id]);
-				if(err) {
-					printf("Error %d assigning DAG deadline to (%s - tdg_id %d)! Exiting...\n", err, graphName[tdg_id], tdg_id);
-					return 1;
+				
+				// Assign periods and deadlines, if any
+				if(graphDeadlines[tdg_id] >= 0) {	
+				  err = dagAssignDeadline(dag[tdg_id], graphDeadlines[tdg_id]);
+				  if(err) {
+					  printf("Error %d assigning DAG deadline to (%s - tdg_id %d)! Exiting...\n", err, graphName[tdg_id], tdg_id);
+					  return 1;
+				  }
 				}
-			}
+				
+			} // UseHgtDotModel
 			else {
 				err = dagAssignParams(dag[tdg_id], 0);
 				if(err) {
@@ -1134,14 +1155,12 @@ main(int argc, char *argv[])
 					return 1;
 				}
 			}
-		}
+			printDag(dag[tdg_id]);
+		} // scheduling != none
 		resetGlobals();
 			
 		argv++;
 	} // for countFiles<num_tdgs
-	
-	for(i=0; i<num_tdgs; i++)
-	  printDag(dag[i]);
 	
 	if(scheduling == NONE)
 	{
